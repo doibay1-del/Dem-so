@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#075ec8">
+<meta name="description" content="Công cụ đếm số hợp lệ và tính tiền nhanh chóng.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>Đếm Số &amp; Tính Tiền</title>
+<style>
+:root{color-scheme:light;--blue:#075ec8;--bg:#f1f5f9;--text:#172033;--muted:#5d687a;--border:#d8e0eb}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;padding:max(16px,env(safe-area-inset-top)) 14px max(24px,env(safe-area-inset-bottom));min-height:100vh;min-height:100dvh;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;display:flex;justify-content:center;align-items:flex-start}
+main{width:100%;max-width:520px;margin:10px auto}.card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 6px 24px #192d4b17}
+h1{margin:0 0 8px;text-align:center;font-size:22px;line-height:1.3}.subtitle{text-align:center;color:var(--muted);font-size:14px;line-height:1.45;margin:0 0 22px}
+label{display:block;margin:0 0 7px;font-size:15px;font-weight:650}
+textarea,input{display:block;width:100%;min-width:0;margin:0 0 17px;padding:13px 14px;border:1px solid var(--border);border-radius:11px;background:#fbfcfe;color:var(--text);font:inherit;font-size:16px;line-height:1.45;appearance:none}
+textarea{min-height:132px;resize:vertical}input{min-height:48px}textarea:focus,input:focus{outline:3px solid #075ec826;border-color:var(--blue);background:#fff}
+.hint,.status{color:var(--muted);font-size:13px;line-height:1.5}.hint{margin:-10px 0 17px}
+.buttons{display:grid;grid-template-columns:1fr;gap:10px}button{min-height:48px;border:0;border-radius:11px;padding:13px 16px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;touch-action:manipulation}
+.primary{color:#fff;background:var(--blue)}.secondary{color:#17416f;background:#eaf2fc}
+.result{margin-top:20px;padding:16px;border:1px solid #dbe5f1;border-radius:13px;background:#f8fafc}.result[hidden],.error[hidden]{display:none}
+.result h2{margin:0 0 14px;font-size:18px}.row{display:flex;justify-content:space-between;gap:12px;margin:0 0 12px;font-size:15px}.row span:last-child{font-weight:750;text-align:right;overflow-wrap:anywhere}
+.list-title{margin:15px 0 7px;font-size:14px;font-weight:700}.valid-list{padding:11px;border:1px solid var(--border);border-radius:9px;background:#fff;overflow-wrap:anywhere;word-break:break-word;font-size:14px;line-height:1.55}
+.money{color:#c33b36;font-size:21px!important}.error{color:#b42318}.footer{text-align:center;color:var(--muted);font-size:12px;line-height:1.5;margin:15px 4px 0}
+@media(min-width:420px){.buttons{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body><main><section class="card" aria-labelledby="pageTitle">
+<h1 id="pageTitle">Đếm Số &amp; Tính Tiền</h1><p class="subtitle">Nhập dãy số, phân tách bằng dấu phẩy hoặc dấu chấm.</p>
+<form id="calculatorForm">
+<label for="inputData">Dãy dữ liệu</label>
+<textarea id="inputData" placeholder="Ví dụ: 10, 20. 30, abc. 40" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
+<p class="hint">Dùng dấu phẩy (,) hoặc dấu chấm (.) để phân tách. Phần tử không phải số sẽ không được tính tiền.</p>
+<label for="unitPrice">Đơn giá (VNĐ cho mỗi số hợp lệ)</label>
+<input type="number" id="unitPrice" value="23000" min="0" step="1" inputmode="numeric">
+<div class="buttons"><button class="primary" type="submit">Tính Ngay</button><button class="secondary" type="button" id="clearButton">Xóa dữ liệu</button></div>
+</form>
+<section class="result" id="resultBox" aria-live="polite" aria-atomic="true" hidden>
+<h2>Kết quả</h2><div class="row"><span>Tổng số phần tử đã nhập</span><span id="totalCount">0</span></div>
+<div class="row"><span>Số lượng giá trị hợp lệ</span><span id="validCount">0</span></div>
+<div class="list-title">Danh sách số hợp lệ</div><div class="valid-list" id="validList">[]</div>
+<hr style="border:0;border-top:1px solid #dbe3ed;margin:16px 0">
+<div class="row"><span>Thành tiền</span><span class="money" id="totalMoney">0 đ</span></div><p class="status" id="calculationNote"></p>
+</section><p class="status error" id="errorMessage" role="alert" hidden></p>
+</section><p class="footer">Dùng trên iPhone, iPad và Android bằng Safari hoặc Chrome.</p></main>
+<script>
+(function(){
+"use strict";
+const form=document.getElementById("calculatorForm"), inputData=document.getElementById("inputData"), priceInput=document.getElementById("unitPrice"), resultBox=document.getElementById("resultBox"), error=document.getElementById("errorMessage");
+function money(v){return new Intl.NumberFormat("vi-VN",{maximumFractionDigits:0}).format(v)+" đ";}
+form.addEventListener("submit",function(e){
+e.preventDefault();error.hidden=true;error.textContent="";
+const raw=inputData.value.trim();
+if(!raw){resultBox.hidden=true;error.textContent="Vui lòng nhập dãy dữ liệu trước khi tính.";error.hidden=false;return;}
+const p=priceInput.value.trim(), price=p===""?NaN:Number(p);
+if(!Number.isFinite(price)||price<0){resultBox.hidden=true;error.textContent="Vui lòng nhập đơn giá hợp lệ, lớn hơn hoặc bằng 0.";error.hidden=false;return;}
+const parts=raw.split(/[,.]+/).map(s=>s.trim()).filter(s=>s!=="");
+const valid=parts.filter(s=>Number.isFinite(Number(s)));
+document.getElementById("totalCount").textContent=String(parts.length);
+document.getElementById("validCount").textContent=String(valid.length);
+document.getElementById("validList").textContent="["+valid.join(", ")+"]";
+document.getElementById("totalMoney").textContent=money(valid.length*price);
+document.getElementById("calculationNote").textContent=valid.length+" giá trị hợp lệ × "+money(price)+" / số.";
+resultBox.hidden=false;
+});
+document.getElementById("clearButton").addEventListener("click",function(){inputData.value="";priceInput.value="23000";resultBox.hidden=true;error.hidden=true;error.textContent="";});
+if("serviceWorker" in navigator && (location.protocol==="https:"||location.hostname==="localhost")) {
+window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("Service worker:",e);});});
+}
+})();
+</script></body></html>
